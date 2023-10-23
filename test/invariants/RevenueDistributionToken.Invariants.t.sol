@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.7;
 
-import {ERC20} from "solady/tokens/ERC20.sol";
+import {ERC20} from "../../src/ERC20.sol";
 import {InvariantTest} from "../utils/InvariantTest.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {BaseTest} from "../base/BaseTest.sol";

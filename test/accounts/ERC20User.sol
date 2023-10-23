@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 
 import {BaseTest} from "../base/BaseTest.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
-import {ERC20} from "solady/tokens/ERC20.sol";
+import {ERC20} from "../../src/ERC20.sol";
 
 contract ERC20User {
     function erc20_approve(address token_, address spender_, uint256 amount_) external {

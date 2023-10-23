@@ -15,7 +15,6 @@ ffi = false
 fs_permissions = []
 remappings = [
     'forge-std/=lib/forge-std/src/',
-    'solady/=lib/solady/src/',
     "erc4626-tests/=lib/erc4626-tests/",
 ]
 

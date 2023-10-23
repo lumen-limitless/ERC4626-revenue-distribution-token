@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity 0.8.20;
+pragma solidity ^0.8.4;
 
-import {ERC20} from "solady/tokens/ERC20.sol";
-import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
-import {Ownable} from "solady/auth/Ownable.sol";
+import {ERC20} from "./ERC20.sol";
+import {SafeTransferLib} from "./SafeTransferLib.sol";
+import {Ownable} from "./Ownable.sol";
 
 /*
     ██████╗ ██████╗ ████████╗

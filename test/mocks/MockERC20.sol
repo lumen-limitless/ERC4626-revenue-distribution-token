@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.4;
 
-import {ERC20} from "solady/tokens/ERC20.sol";
+import {ERC20} from "../../src/ERC20.sol";
 
 contract MockERC20 is ERC20 {
     function name() public pure override returns (string memory) {
