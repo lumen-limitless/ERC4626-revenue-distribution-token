@@ -1,66 +1,44 @@
-## Foundry
+# Revenue Distribution Token
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+![Foundry CI](https://github.com/maple-labs/revenue-distribution-token/actions/workflows/push-to-main.yml/badge.svg) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-Foundry consists of:
+RevenueDistributionToken (RDT) is a token implementing the [ERC4626 Tokenized Vault standard](https://eips.ethereum.org/EIPS/eip-4626) featuring a linear revenue issuance mechanism, intended to distribute protocol revenue to staked users.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+Each new revenue distribution updates the issuance rate, issuing the unvested revenue along with the new revenue over the newly specified vesting schedule. The diagram below visualizes the vesting mechanism across revenue deposits:
 
-## Documentation
+![RDT issuance mechanism](https://user-images.githubusercontent.com/44272939/156643098-fb7cf6e4-91c3-477f-a59c-a1a6c5cf6dc8.svg)
 
-https://book.getfoundry.sh/
+The first revenue deposit is performed at `t0`, scheduled to vest until `t2` (Period 1, or P1), depicted by the green arrow. On this deposit, the balance change of the contract is depicted by the purple arrow, and the issuance rate (`IR1` in the diagram) is set to `depositAmount / (t2 - t0)`.
 
-## Usage
+The second revenue deposit is performed at `t1`, scheduled to vest until `t3` (Period 2, or P2), depicted by the orange arrow. On this deposit, the balance change of the contract is depicted by the purple arrow. Note that this deposit was made during P1. The projected amount that would have been vested in P1 is shown by the dotted green arrow. In order to calculate the new issuance formula, the `totalAssets` are calculated at `t1`, which function as the y-intercept of the issuance function. The issuance rate (`IR2` in the diagram) is set to `(depositAmount2 + unvestedAmount) / (t3 - t1)`.
 
-### Build
+The linear revenue issuance mechanism solves the issue of stakers entering and exiting at favorable times when large discrete revenue distributions are expected, getting an unfair portion of the revenue earned. This issuance mechanism accrues value every block, so that this exploit vector is not possible.
 
-```shell
-$ forge build
+The ERC4626 standard helps RDT conform to a new set of tokens that are used to represent shares of an underlying asset, commonly seen in yield optimization vaults and in our case, interest/revenue bearing tokens. Implementing the standard will improve RDT's composability within DeFi and make it easier for projects and developers familiar with the standard to integrate with RDT.
+
+RDT implements ERC2612 permit approvals for improved contract UX and gas savings.
+
+## Testing and Development
+
+#### Setup
+
+```sh
+git clone git@github.com:maple-labs/revenue-distribution-token.git
+cd revenue-distribution-token
+forge update
 ```
 
-### Test
+#### Running Tests
 
-```shell
-$ forge test
-```
+- To run all unit/fuzz tests: `make test` (runs `./test.sh`)
+- To run all invariant tests: `make invariant` (runs `./invariant.sh`)
+- To run all tests (unit/fuzz and invariant tests): `make test-all`
+- To run specific unit tests: `./test.sh -t <test_name>` (e.g., `./test.sh -t test_deposit`)
+- To run specific invariant tests: `./invariant-test.sh -t <test_name>` (e.g., `./invariant-test.sh -t invariant_totalSupply`)
+- To run specific fuzz tests with a specified number of fuzz runs: `./test.sh -r <runs>` (e.g., `./test.sh -t testFuzz_redeem -r 10000`)
 
-### Format
+This project was built using [Foundry](https://github.com/gakonst/Foundry).
 
-```shell
-$ forge fmt
-```
+## Acknowledgements
 
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+Authors of the [EIP-4626 standard](https://eips.ethereum.org/EIPS/eip-4626), who worked towards standardizing the common tokenized vault use case in DeFi and therefore shaped the interface of the Revenue Distribution Token.
