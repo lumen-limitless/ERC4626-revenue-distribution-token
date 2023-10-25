@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.20;
 
 import {ERC20} from "./ERC20.sol";
 import {SafeTransferLib} from "./SafeTransferLib.sol";
 import {Ownable} from "./Ownable.sol";
+import {ReentrancyGuard} from "./ReentrancyGuard.sol";
 
 /*
     ██████╗ ██████╗ ████████╗
@@ -14,7 +15,7 @@ import {Ownable} from "./Ownable.sol";
     ╚═╝  ╚═╝╚═════╝    ╚═╝
 */
 
-contract RevenueDistributionToken is ERC20, Ownable {
+contract RevenueDistributionToken is ERC20, Ownable, ReentrancyGuard {
     // =============================================================
     //                       EVENTS
     // =============================================================
@@ -74,58 +75,77 @@ contract RevenueDistributionToken is ERC20, Ownable {
     //                       ERRORS
     // =============================================================
 
-    error InvalidConstructorArgs();
     error ZeroReceiver();
     error ZeroShares();
     error ZeroAssets();
     error ZeroSupply();
     error InsufficientPermit();
-    error NoReentrancy();
 
     // =============================================================
     //                       IMMUTABLES
     // =============================================================
 
-    uint256 public immutable precision; // Precision of rates, equals max deposit amounts before rounding errors occur
+    /**
+     *  @dev The precision at which the issuance rate is measured.
+     */
+    uint256 public immutable precision;
 
     // =============================================================
     //                       STORAGE
     // =============================================================
 
+    /**
+     *  @dev    The address of the underlying asset used by the Vault.
+     *          MUST be a contract that implements the ERC-20 standard.
+     *          MUST NOT revert.
+     */
     address public asset; // Underlying ERC-20 asset used by ERC-4626 functionality.
 
-    uint256 public freeAssets; // Amount of assets unlocked regardless of time passed.
-    uint256 public issuanceRate; // asset/second rate dependent on aggregate vesting schedule.
-    uint256 public lastUpdated; // Timestamp of when issuance equation was last updated.
+    /**
+     *  @dev The total amount of the underlying asset that is currently unlocked and is not time-dependent.
+     *       Analogous to the y-intercept in a linear function.
+     */
+    uint256 public freeAssets;
+
+    /**
+     *  @dev The rate of issuance of the vesting schedule that is currently active.
+     *       Denominated as the amount of underlying assets vesting per second.
+     */
+    uint256 public issuanceRate;
+
+    /**
+     *  @dev The timestamp of when the linear function was last recalculated.
+     *       Analogous to t0 in a linear function.
+     */
+    uint256 public lastUpdated;
+
+    /**
+     *  @dev The end of the current vesting schedule.
+     */
     uint256 public vestingPeriodFinish; // Timestamp when current vesting schedule ends.
 
-    uint256 private _locked = 1; // Used in reentrancy check.
-
+    /**
+     *  @dev The name of the token.
+     */
     string private _name;
 
+    /**
+     *  @dev The symbol of the token.
+     */
     string private _symbol;
-
-    // =============================================================
-    //                       MODIFIERS
-    // =============================================================
-
-    modifier nonReentrant() {
-        if (_locked == 2) revert NoReentrancy();
-
-        _locked = 2;
-
-        _;
-
-        _locked = 1;
-    }
 
     // =============================================================
     //                       CONSTRUCTOR
     // =============================================================
 
     constructor(string memory name_, string memory symbol_, address owner_, address asset_, uint256 precision_) {
-        if (asset_ == address(0)) revert InvalidConstructorArgs();
-        if (owner_ == address(0)) revert InvalidConstructorArgs();
+        assembly {
+            if or(iszero(owner_), iszero(asset_)) {
+                mstore(0x00, "zero address")
+                revert(0x00, 0x20)
+            }
+        }
+
         _initializeOwner(owner_);
 
         asset = asset_;
@@ -139,6 +159,12 @@ contract RevenueDistributionToken is ERC20, Ownable {
     //                       OWNER FUNCTIONS
     // =============================================================
 
+    /**
+     *  @dev    Updates the current vesting formula based on the amount of total unvested funds in the contract and the new `vestingPeriod_`.
+     *  @param  vestingPeriod_ The amount of time over which all currently unaccounted underlying assets will be vested over.
+     *  @return issuanceRate_  The new issuance rate.
+     *  @return freeAssets_    The new amount of underlying assets that are unlocked.
+     */
     function updateVestingSchedule(uint256 vestingPeriod_)
         external
         virtual
@@ -165,10 +191,28 @@ contract RevenueDistributionToken is ERC20, Ownable {
     //                       STAKER FUNCTIONS
     // =============================================================
 
+    /**
+     *  @dev    Mints `shares_` to `receiver_` by depositing `assets_` into the Vault.
+     *          MUST emit the {Deposit} event.
+     *          MUST revert if all of the assets cannot be deposited (due to insufficient approval, deposit limits, slippage, etc).
+     *  @param  assets_   The amount of assets to deposit.
+     *  @param  receiver_ The receiver of the shares.
+     *  @return shares_   The amount of shares minted.
+     */
     function deposit(uint256 assets_, address receiver_) external virtual nonReentrant returns (uint256 shares_) {
         _mint(shares_ = previewDeposit(assets_), assets_, receiver_, msg.sender);
     }
 
+    /**
+     *  @dev    Does a ERC4626 `deposit` with a ERC-2612 `permit`.
+     *  @param  assets_   The amount of `asset` to deposit.
+     *  @param  receiver_ The receiver of the shares.
+     *  @param  deadline_ The timestamp after which the `permit` signature is no longer valid.
+     *  @param  v_        ECDSA signature v component.
+     *  @param  r_        ECDSA signature r component.
+     *  @param  s_        ECDSA signature s component.
+     *  @return shares_   The amount of shares minted.
+     */
     function depositWithPermit(uint256 assets_, address receiver_, uint256 deadline_, uint8 v_, bytes32 r_, bytes32 s_)
         external
         virtual
@@ -179,10 +223,29 @@ contract RevenueDistributionToken is ERC20, Ownable {
         _mint(shares_ = previewDeposit(assets_), assets_, receiver_, msg.sender);
     }
 
+    /**
+     *  @dev    Mints `shares_` to `receiver_` by depositing `assets_` into the Vault.
+     *          MUST emit the {Deposit} event.
+     *          MUST revert if all of shares cannot be minted (due to insufficient approval, deposit limits, slippage, etc).
+     *  @param  shares_   The amount of shares to mint.
+     *  @param  receiver_ The receiver of the shares.
+     *  @return assets_   The amount of assets deposited.
+     */
     function mint(uint256 shares_, address receiver_) external virtual nonReentrant returns (uint256 assets_) {
         _mint(shares_, assets_ = previewMint(shares_), receiver_, msg.sender);
     }
 
+    /**
+     *  @dev    Does a ERC4626 `mint` with a ERC-2612 `permit`.
+     *  @param  shares_    The amount of `shares` to mint.
+     *  @param  receiver_  The receiver of the shares.
+     *  @param  maxAssets_ The maximum amount of assets that can be taken, as per the permit.
+     *  @param  deadline_  The timestamp after which the `permit` signature is no longer valid.
+     *  @param  v_         ECDSA signature v component.
+     *  @param  r_         ECDSA signature r component.
+     *  @param  s_         ECDSA signature s component.
+     *  @return assets_    The amount of shares deposited.
+     */
     function mintWithPermit(
         uint256 shares_,
         address receiver_,
@@ -198,6 +261,15 @@ contract RevenueDistributionToken is ERC20, Ownable {
         _mint(shares_, assets_, receiver_, msg.sender);
     }
 
+    /**
+     *  @dev    Burns `shares_` from `owner_` and sends `assets_` to `receiver_`.
+     *          MUST emit the {Withdraw} event.
+     *          MUST revert if all of the shares cannot be redeemed (due to insufficient shares, withdrawal limits, slippage, etc).
+     *  @param  shares_   The amount of shares to redeem.
+     *  @param  receiver_ The receiver of the assets.
+     *  @param  owner_    The owner of the shares.
+     *  @return assets_   The amount of assets sent to the receiver.
+     */
     function redeem(uint256 shares_, address receiver_, address owner_)
         external
         virtual
@@ -207,6 +279,15 @@ contract RevenueDistributionToken is ERC20, Ownable {
         _burn(shares_, assets_ = previewRedeem(shares_), receiver_, owner_, msg.sender);
     }
 
+    /**
+     *  @dev    Burns `shares_` from `owner_` and sends `assets_` to `receiver_`.
+     *          MUST emit the {Withdraw} event.
+     *          MUST revert if all of the assets cannot be withdrawn (due to insufficient assets, withdrawal limits, slippage, etc).
+     *  @param  assets_   The amount of assets to withdraw.
+     *  @param  receiver_ The receiver of the assets.
+     *  @param  owner_    The owner of the assets.
+     *  @return shares_   The amount of shares burned from the owner.
+     */
     function withdraw(uint256 assets_, address receiver_, address owner_)
         external
         virtual
@@ -278,46 +359,113 @@ contract RevenueDistributionToken is ERC20, Ownable {
         return _symbol;
     }
 
-    function balanceOfAssets(address account_) public view virtual returns (uint256 balanceOfAssets_) {
+    /**
+     *  @dev    Returns the amount of underlying assets owned by the specified account.
+     *  @param  account_ Address of the account.
+     *  @return assets_  Amount of assets owned.
+     */
+    function balanceOfAssets(address account_) public view virtual returns (uint256 assets_) {
         return convertToAssets(balanceOf(account_));
     }
 
+    /**
+     *  @dev    The amount of `assets_` the `shares_` are currently equivalent to.
+     *          MUST NOT be inclusive of any fees that are charged against assets in the Vault.
+     *          MUST NOT reflect slippage or other on-chain conditions when performing the actual exchange.
+     *          MUST NOT show any variations depending on the caller.
+     *          MUST NOT revert.
+     *  @param  shares_ The amount of shares to convert.
+     *  @return assets_ The amount of equivalent assets.
+     */
     function convertToAssets(uint256 shares_) public view virtual returns (uint256 assets_) {
         uint256 supply = totalSupply(); // Cache to stack.
 
         assets_ = supply == 0 ? shares_ : (shares_ * totalAssets()) / supply;
     }
 
+    /**
+     *  @dev    The amount of `shares_` the `assets_` are currently equivalent to.
+     *          MUST NOT be inclusive of any fees that are charged against assets in the Vault.
+     *          MUST NOT reflect slippage or other on-chain conditions when performing the actual exchange.
+     *          MUST NOT show any variations depending on the caller.
+     *          MUST NOT revert.
+     *  @param  assets_ The amount of assets to convert.
+     *  @return shares_ The amount of equivalent shares.
+     */
     function convertToShares(uint256 assets_) public view virtual returns (uint256 shares_) {
         uint256 supply = totalSupply(); // Cache to stack.
 
         shares_ = supply == 0 ? assets_ : (assets_ * supply) / totalAssets();
     }
 
-    function maxDeposit(address receiver_) external pure virtual returns (uint256 maxAssets_) {
+    /**
+     *  @dev    Maximum amount of `assets_` that can be deposited on behalf of the `receiver_` through a `deposit` call.
+     *          MUST return a limited value if the receiver is subject to any limits, or the maximum value otherwise.
+     *          MUST NOT revert.
+     *  @param  receiver_ The receiver of the assets.
+     *  @return assets_   The maximum amount of assets that can be deposited.
+     */
+    function maxDeposit(address receiver_) external pure virtual returns (uint256 assets_) {
         receiver_; // Silence warning
-        maxAssets_ = type(uint256).max;
+        assets_ = type(uint256).max;
     }
 
-    function maxMint(address receiver_) external pure virtual returns (uint256 maxShares_) {
+    /**
+     *  @dev    Maximum amount of `shares_` that can be minted on behalf of the `receiver_` through a `mint` call.
+     *          MUST return a limited value if the receiver is subject to any limits, or the maximum value otherwise.
+     *          MUST NOT revert.
+     *  @param  receiver_ The receiver of the shares.
+     *  @return shares_   The maximum amount of shares that can be minted.
+     */
+    function maxMint(address receiver_) external pure virtual returns (uint256 shares_) {
         receiver_; // Silence warning
-        maxShares_ = type(uint256).max;
+        shares_ = type(uint256).max;
     }
 
-    function maxRedeem(address owner_) external view virtual returns (uint256 maxShares_) {
-        maxShares_ = balanceOf(owner_);
+    /**
+     *  @dev    Maximum amount of `shares_` that can be redeemed from the `owner_` through a `redeem` call.
+     *          MUST return a limited value if the owner is subject to any limits, or the total amount of owned shares otherwise.
+     *          MUST NOT revert.
+     *  @param  owner_  The owner of the shares.
+     *  @return shares_ The maximum amount of shares that can be redeemed.
+     */
+    function maxRedeem(address owner_) external view virtual returns (uint256 shares_) {
+        shares_ = balanceOf(owner_);
     }
 
-    function maxWithdraw(address owner_) external view virtual returns (uint256 maxAssets_) {
-        maxAssets_ = balanceOfAssets(owner_);
+    /**
+     *  @dev    Maximum amount of `assets_` that can be withdrawn from the `owner_` through a `withdraw` call.
+     *          MUST return a limited value if the owner is subject to any limits, or the total amount of owned assets otherwise.
+     *          MUST NOT revert.
+     *  @param  owner_  The owner of the assets.
+     *  @return assets_ The maximum amount of assets that can be withdrawn.
+     */
+    function maxWithdraw(address owner_) external view virtual returns (uint256 assets_) {
+        assets_ = balanceOfAssets(owner_);
     }
 
+    /**
+     *  @dev    Allows an on-chain or off-chain user to simulate the effects of their deposit at the current block, given current on-chain conditions.
+     *          MUST return as close to and no more than the exact amount of shares that would be minted in a `deposit` call in the same transaction.
+     *          MUST NOT account for deposit limits like those returned from `maxDeposit` and should always act as though the deposit would be accepted.
+     *          MUST NOT revert.
+     *  @param  assets_ The amount of assets to deposit.
+     *  @return shares_ The amount of shares that would be minted.
+     */
     function previewDeposit(uint256 assets_) public view virtual returns (uint256 shares_) {
         // As per https://eips.ethereum.org/EIPS/eip-4626#security-considerations,
         // it should round DOWN if it’s calculating the amount of shares to issue to a user, given an amount of assets provided.
         shares_ = convertToShares(assets_);
     }
 
+    /**
+     *  @dev    Allows an on-chain or off-chain user to simulate the effects of their mint at the current block, given current on-chain conditions.
+     *          MUST return as close to and no fewer than the exact amount of assets that would be deposited in a `mint` call in the same transaction.
+     *          MUST NOT account for mint limits like those returned from `maxMint` and should always act as though the minting would be accepted.
+     *          MUST NOT revert.
+     *  @param  shares_ The amount of shares to mint.
+     *  @return assets_ The amount of assets that would be deposited.
+     */
     function previewMint(uint256 shares_) public view virtual returns (uint256 assets_) {
         uint256 supply = totalSupply(); // Cache to stack.
 
@@ -326,12 +474,28 @@ contract RevenueDistributionToken is ERC20, Ownable {
         assets_ = supply == 0 ? shares_ : _divRoundUp(shares_ * totalAssets(), supply);
     }
 
+    /**
+     *  @dev    Allows an on-chain or off-chain user to simulate the effects of their redemption at the current block, given current on-chain conditions.
+     *          MUST return as close to and no more than the exact amount of assets that would be withdrawn in a `redeem` call in the same transaction.
+     *          MUST NOT account for redemption limits like those returned from `maxRedeem` and should always act as though the redemption would be accepted.
+     *          MUST NOT revert.
+     *  @param  shares_ The amount of shares to redeem.
+     *  @return assets_ The amount of assets that would be withdrawn.
+     */
     function previewRedeem(uint256 shares_) public view virtual returns (uint256 assets_) {
         // As per https://eips.ethereum.org/EIPS/eip-4626#security-considerations,
         // it should round DOWN if it’s calculating the amount of assets to send to a user, given amount of shares returned.
         assets_ = convertToAssets(shares_);
     }
 
+    /**
+     *  @dev    Allows an on-chain or off-chain user to simulate the effects of their withdrawal at the current block, given current on-chain conditions.
+     *          MUST return as close to and no fewer than the exact amount of shares that would be burned in a `withdraw` call in the same transaction.
+     *          MUST NOT account for withdrawal limits like those returned from `maxWithdraw` and should always act as though the withdrawal would be accepted.
+     *          MUST NOT revert.
+     *  @param  assets_ The amount of assets to withdraw.
+     *  @return shares_ The amount of shares that would be redeemed.
+     */
     function previewWithdraw(uint256 assets_) public view virtual returns (uint256 shares_) {
         uint256 supply = totalSupply(); // Cache to stack.
 
@@ -340,7 +504,13 @@ contract RevenueDistributionToken is ERC20, Ownable {
         shares_ = supply == 0 ? assets_ : _divRoundUp(assets_ * supply, totalAssets());
     }
 
-    function totalAssets() public view virtual returns (uint256 totalManagedAssets_) {
+    /**
+     *  @dev    Total amount of the underlying asset that is managed by the Vault.
+     *          SHOULD include compounding that occurs from any yields.
+     *          MUST NOT revert.
+     *  @return totalAssets_ The total amount of assets the Vault manages.
+     */
+    function totalAssets() public view virtual returns (uint256 totalAssets_) {
         uint256 issuanceRate_ = issuanceRate;
 
         if (issuanceRate_ == 0) return freeAssets;
