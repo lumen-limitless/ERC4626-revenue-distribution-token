@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.4;
 
 import {ERC20} from "../../src/ERC20.sol";
 import {InvariantTest} from "../utils/InvariantTest.sol";
@@ -33,7 +33,7 @@ contract Invariants is BaseTest, InvariantTest {
 
     function setUp() public virtual {
         _underlying = new MockERC20();
-        _pool = new MutablePool("Vesting Pool", "VP", address(this), ERC20(address(_underlying)));
+        _pool = new MutablePool( address(this), ERC20(address(_underlying)));
         _erc20User = new InvariantERC20User(address(_pool), address(_underlying));
         _stakerManager = new InvariantStakerManager(address(_pool), address(_underlying));
         _owner = new InvariantOwner(address(_pool), address(_underlying));

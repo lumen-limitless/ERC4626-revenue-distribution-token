@@ -3,7 +3,7 @@
 pragma solidity ^0.8.4;
 
 import {BaseTest} from "./BaseTest.sol";
-import {RevenueDistributionToken} from "../../src/RevenueDistributionToken.sol";
+import {MockRevenueDistributionToken} from "../mocks/MockRevenueDistributionToken.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 
 contract PoolTestBase is BaseTest {
@@ -21,11 +21,11 @@ contract PoolTestBase is BaseTest {
     uint256 deadline = 5_000_000_000; // Timestamp far in the future
 
     MockERC20 public asset;
-    RevenueDistributionToken public pool;
+    MockRevenueDistributionToken public pool;
 
     function setUp() public virtual {
         asset = new MockERC20();
-        pool = new RevenueDistributionToken("TEST POOL", "TEST", address(this), address(asset), 1e30 );
+        pool = new MockRevenueDistributionToken( address(this), address(asset), 1e30 );
 
         vm.warp(START);
     }
@@ -44,7 +44,7 @@ contract PoolTestBase is BaseTest {
     function _transferAndUpdateVesting(address asset_, address pool_, uint256 amount_, uint256 duration_) internal {
         MockERC20(asset_).mint(address(this), amount_);
         MockERC20(asset_).transfer(address(pool), amount_);
-        RevenueDistributionToken(pool_).updateVestingSchedule(duration_);
+        MockRevenueDistributionToken(pool_).updateVestingSchedule(duration_);
     }
 
     // Returns an ERC-2612 `permit` digest for the `owner` to sign
@@ -63,8 +63,8 @@ contract PoolTestBase is BaseTest {
     }
 
     function _getMinDeposit(address pool_) internal view returns (uint256 minDeposit_) {
-        minDeposit_ =
-            (RevenueDistributionToken(pool_).totalAssets() - 1) / RevenueDistributionToken(pool_).totalSupply() + 1;
+        minDeposit_ = (MockRevenueDistributionToken(pool_).totalAssets() - 1)
+            / MockRevenueDistributionToken(pool_).totalSupply() + 1;
     }
 
     // Returns a valid `permit` signature signed by this contract's `owner` address

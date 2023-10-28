@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.4;
 
 import {ERC20} from "../../src/ERC20.sol";
 import {MockRevertingERC20} from "../mocks/MockRevertingERC20.sol";

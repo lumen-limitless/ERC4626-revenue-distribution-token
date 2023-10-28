@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.4;
 
 import {ERC20} from "./ERC20.sol";
 import {SafeTransferLib} from "./SafeTransferLib.sol";
@@ -15,7 +15,9 @@ import {ReentrancyGuard} from "./ReentrancyGuard.sol";
     ╚═╝  ╚═╝╚═════╝    ╚═╝
 */
 
-contract RevenueDistributionToken is ERC20, Ownable, ReentrancyGuard {
+/// @title RevenueDistributionToken
+/// @author Modified from (https://github.com/maple-labs/revenue-distribution-token/blob/main/contracts/RevenueDistributionToken.sol)
+abstract contract RevenueDistributionToken is ERC20, Ownable, ReentrancyGuard {
     // =============================================================
     //                       EVENTS
     // =============================================================
@@ -124,21 +126,11 @@ contract RevenueDistributionToken is ERC20, Ownable, ReentrancyGuard {
      */
     uint256 public vestingPeriodFinish; // Timestamp when current vesting schedule ends.
 
-    /**
-     *  @dev The name of the token.
-     */
-    string private _name;
-
-    /**
-     *  @dev The symbol of the token.
-     */
-    string private _symbol;
-
     // =============================================================
     //                       CONSTRUCTOR
     // =============================================================
 
-    constructor(string memory name_, string memory symbol_, address owner_, address asset_, uint256 precision_) {
+    constructor(address owner_, address asset_, uint256 precision_) {
         assembly {
             if or(iszero(owner_), iszero(asset_)) {
                 mstore(0x00, "zero address")
@@ -149,10 +141,8 @@ contract RevenueDistributionToken is ERC20, Ownable, ReentrancyGuard {
         _initializeOwner(owner_);
 
         asset = asset_;
-        precision = precision_;
 
-        _name = name_;
-        _symbol = symbol_;
+        precision = precision_;
     }
 
     // =============================================================
@@ -350,14 +340,6 @@ contract RevenueDistributionToken is ERC20, Ownable, ReentrancyGuard {
     // =============================================================
     //                       VIEW FUNCTIONS
     // =============================================================
-
-    function name() public view virtual override returns (string memory) {
-        return _name;
-    }
-
-    function symbol() public view virtual override returns (string memory) {
-        return _symbol;
-    }
 
     /**
      *  @dev    Returns the amount of underlying assets owned by the specified account.

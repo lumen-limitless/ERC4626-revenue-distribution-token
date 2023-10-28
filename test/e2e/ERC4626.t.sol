@@ -4,12 +4,12 @@ pragma solidity >=0.8.0 <0.9.0;
 import "erc4626-tests/ERC4626.test.sol";
 
 import {MockERC20} from "../mocks/MockERC20.sol";
-import {RevenueDistributionToken} from "../../src/RevenueDistributionToken.sol";
+import {MockRevenueDistributionToken} from "../mocks/MockRevenueDistributionToken.sol";
 
 contract ERC4626StdTest is ERC4626Test {
     function setUp() public override {
         _underlying_ = address(new MockERC20());
-        _vault_ = address(new RevenueDistributionToken("MockERC4626", "MockERC4626", address(this), _underlying_, 1e30));
+        _vault_ = address(new MockRevenueDistributionToken( address(this), _underlying_, 1e30));
         _delta_ = 0;
     }
 
@@ -22,7 +22,7 @@ contract ERC4626StdTest is ERC4626Test {
             catch {
                 vm.assume(false);
             }
-            try RevenueDistributionToken(_vault_).updateVestingSchedule(10) {}
+            try MockRevenueDistributionToken(_vault_).updateVestingSchedule(10) {}
             catch {
                 vm.assume(false);
             }

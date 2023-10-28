@@ -1,25 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.4;
 
 import {ERC20} from "../../src/ERC20.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {MockRevertingERC20} from "../mocks/MockRevertingERC20.sol";
-import {RevenueDistributionToken} from "src/RevenueDistributionToken.sol";
+import {MockRevenueDistributionToken} from "../mocks/MockRevenueDistributionToken.sol";
 import {BaseTest} from "../base/BaseTest.sol";
 import {PoolTestBase} from "../base/PoolTestBase.sol";
 import {PoolSuccessTestBase} from "../base/PoolSuccessTestBase.sol";
 import {Staker} from "../accounts/Staker.sol";
 
-contract UnitTests is PoolTestBase {
+contract RevenueDistributionTokenTests is PoolTestBase {
     function testFuzz_deposit(uint128 amount_, uint56 warpTime) public {
         vm.assume(amount_ > 0);
         vm.assume(warpTime > 0);
         uint256 amount = amount_;
 
         // deploy fresh pool
-        RevenueDistributionToken pool_ =
-            new RevenueDistributionToken( "TEST POOL", "TEST",address(this), address(asset), 1e30);
+        MockRevenueDistributionToken pool_ = new MockRevenueDistributionToken(address(this), address(asset), 1e30);
 
         vm.startPrank(TESTER);
 
@@ -49,8 +48,7 @@ contract UnitTests is PoolTestBase {
         uint256 amount = amount_;
 
         // deploy fresh pool
-        RevenueDistributionToken pool_ =
-            new RevenueDistributionToken("TEST POOL", "TEST",address(this), address(asset), 1e30);
+        MockRevenueDistributionToken pool_ = new MockRevenueDistributionToken(address(this), address(asset), 1e30);
 
         vm.startPrank(TESTER);
 
@@ -81,8 +79,7 @@ contract UnitTests is PoolTestBase {
         uint256 amount = amount_;
 
         // deploy fresh pool
-        RevenueDistributionToken pool_ =
-            new RevenueDistributionToken("TEST POOL", "TEST",address(this), address(asset), 1e30);
+        MockRevenueDistributionToken pool_ = new MockRevenueDistributionToken(address(this), address(asset), 1e30);
 
         vm.startPrank(TESTER);
 
@@ -120,8 +117,7 @@ contract UnitTests is PoolTestBase {
         uint256 amount = amount_;
 
         // deploy fresh pool
-        RevenueDistributionToken pool_ =
-            new RevenueDistributionToken("TEST POOL", "TEST",address(this), address(asset), 1e30);
+        MockRevenueDistributionToken pool_ = new MockRevenueDistributionToken(address(this), address(asset), 1e30);
 
         vm.startPrank(TESTER);
 
@@ -160,8 +156,7 @@ contract UnitTests is PoolTestBase {
         vm.assume(stakeTimeAsDurationPercentage > 0);
 
         // deploy fresh pool
-        RevenueDistributionToken pool_ =
-            new RevenueDistributionToken("TEST POOL", "TEST",address(this), address(asset), 1e30);
+        MockRevenueDistributionToken pool_ = new MockRevenueDistributionToken(address(this), address(asset), 1e30);
         asset.mint(address(this), 1 ether);
         asset.approve(address(pool_), type(uint256).max);
         pool_.deposit(1 ether, address(this));
@@ -205,8 +200,7 @@ contract UnitTests is PoolTestBase {
         address owner_ = vm.addr(sk_);
 
         // deploy fresh pool
-        RevenueDistributionToken pool_ =
-            new RevenueDistributionToken("TEST POOL", "TEST",address(this), address(asset), 1e30);
+        MockRevenueDistributionToken pool_ = new MockRevenueDistributionToken(address(this), address(asset), 1e30);
 
         vm.startPrank(owner_);
 

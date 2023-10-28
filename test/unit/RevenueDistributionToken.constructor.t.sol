@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.4;
 
 import {ERC20} from "../../src/ERC20.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {MockRevertingERC20} from "../mocks/MockRevertingERC20.sol";
-import {RevenueDistributionToken} from "src/RevenueDistributionToken.sol";
+import {MockRevenueDistributionToken} from "../mocks/MockRevenueDistributionToken.sol";
 import {BaseTest} from "../base/BaseTest.sol";
 import {PoolTestBase} from "../base/PoolTestBase.sol";
 import {PoolSuccessTestBase} from "../base/PoolSuccessTestBase.sol";
@@ -21,15 +21,14 @@ contract ConstructorTests is BaseTest {
 
         //reverts if initialOwner is address(0)
         vm.expectRevert();
-        RevenueDistributionToken pool =
-            new RevenueDistributionToken("TEST POOL", "TEST",address(0), address(asset), 1e30 );
+        MockRevenueDistributionToken pool = new MockRevenueDistributionToken(address(0), address(asset), 1e30 );
 
         //reverts if asset is address(0)
         vm.expectRevert();
-        pool = new RevenueDistributionToken("TEST POOL", "TEST", address(this), address(0), 1e30 );
+        pool = new MockRevenueDistributionToken( address(this), address(0), 1e30 );
 
         //successful constructor
-        pool = new RevenueDistributionToken("TEST POOL", "TEST", address(this), address(asset), 1e30 );
+        pool = new MockRevenueDistributionToken( address(this), address(asset), 1e30 );
 
         assertEq(pool.owner(), address(this));
         assertEq(pool.decimals(), 18);
