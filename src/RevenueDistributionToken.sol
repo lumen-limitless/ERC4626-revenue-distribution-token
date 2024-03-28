@@ -209,7 +209,7 @@ abstract contract RevenueDistributionToken is ERC20, Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256 shares_)
     {
-        ERC20(asset).permit(msg.sender, address(this), assets_, deadline_, v_, r_, s_);
+        SafeTransferLib.permit2(asset, msg.sender, address(this), assets_, deadline_, v_, r_, s_);
         _mint(shares_ = previewDeposit(assets_), assets_, receiver_, msg.sender);
     }
 
@@ -247,7 +247,7 @@ abstract contract RevenueDistributionToken is ERC20, Ownable, ReentrancyGuard {
     ) external virtual nonReentrant returns (uint256 assets_) {
         if ((assets_ = previewMint(shares_)) > maxAssets_) revert InsufficientPermit();
 
-        ERC20(asset).permit(msg.sender, address(this), maxAssets_, deadline_, v_, r_, s_);
+        SafeTransferLib.permit2(asset, msg.sender, address(this), maxAssets_, deadline_, v_, r_, s_);
         _mint(shares_, assets_, receiver_, msg.sender);
     }
 
